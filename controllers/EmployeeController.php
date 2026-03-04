@@ -1,0 +1,288 @@
+<?php
+// ==========================================
+// ชื่อไฟล์: EmployeeController.php
+// ที่อยู่ไฟล์: controllers/EmployeeController.php
+// ==========================================
+
+require_once 'models/Employee.php';
+require_once 'models/Department.php';
+require_once 'models/PositionLevel.php';
+require_once 'models/Manpower.php'; 
+
+class EmployeeController {
+    private $db;
+
+    public function __construct($db) {
+        $this->db = $db;
+    }
+
+    private function uploadAvatar($file) {
+        if ($file['error'] == 0) {
+            $target_dir = "uploads/";
+            if (!file_exists($target_dir)) mkdir($target_dir, 0777, true);
+            $file_extension = pathinfo($file["name"], PATHINFO_EXTENSION);
+            $new_filename = uniqid() . '.' . strtolower($file_extension);
+            $target_file = $target_dir . $new_filename;
+            $check = getimagesize($file["tmp_name"]);
+            if($check !== false && in_array(strtolower($file_extension), ['jpg', 'jpeg', 'png', 'gif'])) {
+                if (move_uploaded_file($file["tmp_name"], $target_file)) return $new_filename;
+            }
+        }
+        return null;
+    }
+
+    public function index() {
+        $employeeModel = new Employee($this->db);
+        $records_per_page = 10;
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        if($page < 1) $page = 1;
+        $from_record_num = ($records_per_page * $page) - $records_per_page;
+        $search_term = isset($_GET['search']) ? trim($_GET['search']) : "";
+        
+        $query = "SELECT e.*, w.position_name AS position, w.department, w.level, m.employee_type 
+                  FROM employees e
+                  LEFT JOIN emp_work_history w ON w.id = (
+                      SELECT id FROM emp_work_history WHERE employee_id = e.id ORDER BY id DESC LIMIT 1
+                  )
+                  LEFT JOIN manpower m ON m.position_number COLLATE utf8mb4_unicode_ci = e.emp_code COLLATE utf8mb4_unicode_ci";
+        
+        if(!empty($search_term)) {
+            $query .= " WHERE e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ? OR w.position_name LIKE ?";
+        }
+        $query .= " ORDER BY e.id DESC LIMIT ?, ?";
+        
+        $stmt = $this->db->prepare($query);
+        
+        if(!empty($search_term)) {
+            $search_param = "%{$search_term}%";
+            $stmt->bindParam(1, $search_param);
+            $stmt->bindParam(2, $search_param);
+            $stmt->bindParam(3, $search_param);
+            $stmt->bindParam(4, $search_param);
+            $stmt->bindParam(5, $from_record_num, PDO::PARAM_INT);
+            $stmt->bindParam(6, $records_per_page, PDO::PARAM_INT);
+        } else {
+            $stmt->bindParam(1, $from_record_num, PDO::PARAM_INT);
+            $stmt->bindParam(2, $records_per_page, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $total_rows = $employeeModel->countAll($search_term);
+        $total_pages = ceil($total_rows / $records_per_page);
+
+        require_once 'views/employee/index.php';
+    }
+
+    public function create() {
+        $deptModel = new Department($this->db);
+        $departments = $deptModel->readAll()->fetchAll(PDO::FETCH_ASSOC);
+
+        $levelModel = new PositionLevel($this->db);
+        $position_levels = $levelModel->readAll()->fetchAll(PDO::FETCH_ASSOC);
+
+        $manpowerModel = new Manpower($this->db);
+        $manpowers = $manpowerModel->readAvailablePositions()->fetchAll(PDO::FETCH_ASSOC);
+
+        require_once 'views/employee/create.php';
+    }
+
+    public function store() {
+        if ($_SERVER["REQUEST_METHOD"] == "POST") {
+            $employeeModel = new Employee($this->db);
+            $manpowerModel = new Manpower($this->db); 
+
+            $national_id = trim($_POST['national_id'] ?? '');
+
+            // 🛑 ตรวจสอบเลขประจำตัวประชาชนซ้ำ
+            if (!empty($national_id) && $employeeModel->isNationalIdExists($national_id)) {
+                $_SESSION['message'] = "เกิดข้อผิดพลาด! เลขประจำตัวประชาชน '{$national_id}' มีประวัติอยู่ในระบบแล้ว";
+                $_SESSION['message_type'] = "danger";
+                header("Location: index.php?action=create");
+                exit();
+            }
+
+            $avatar_filename = null;
+            if(isset($_FILES['avatar']) && $_FILES['avatar']['error'] == 0) {
+                $avatar_filename = $this->uploadAvatar($_FILES['avatar']);
+            }
+
+            $selected_position = trim($_POST['emp_code'] ?? '');
+
+            $data = [
+                'emp_code' => $selected_position,
+                'national_id' => $national_id,
+                'prefix' => $_POST['prefix'] ?? '',
+                'gender' => $_POST['gender'] ?? '',
+                'dob' => trim($_POST['dob'] ?? ''),
+                'first_name' => trim($_POST['first_name'] ?? ''),
+                'last_name' => trim($_POST['last_name'] ?? ''),
+                'phone' => trim($_POST['phone'] ?? ''),
+                'email' => trim($_POST['email'] ?? ''),
+                'avatar' => $avatar_filename
+            ];
+
+            $new_emp_id = $employeeModel->create($data);
+
+            if($new_emp_id) {
+                $this->saveRelations($employeeModel, $new_emp_id, $_POST);
+                if(!empty($selected_position)) {
+                    $manpowerModel->updateStatusByPositionNumber($selected_position, 'occupied');
+                }
+                $_SESSION['message'] = "เพิ่มบุคลากรและจองตำแหน่งสำเร็จ!";
+                $_SESSION['message_type'] = "success";
+                header("Location: index.php?action=employees");
+                exit();
+            } else {
+                $_SESSION['message'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล!";
+                $_SESSION['message_type'] = "danger";
+                header("Location: index.php?action=create");
+                exit();
+            }
+        }
+    }
+
+    public function show() {
+        if(isset($_GET['id'])) {
+            $employeeModel = new Employee($this->db);
+            $empData = $employeeModel->readOne($_GET['id']);
+            
+            $empType = '- ไม่ระบุ -';
+            if(!empty($empData['emp_code'])) {
+                $stmt = $this->db->prepare("SELECT employee_type FROM manpower WHERE position_number = ?");
+                $stmt->execute([$empData['emp_code']]);
+                $mp = $stmt->fetch(PDO::FETCH_ASSOC);
+                if($mp) $empType = $mp['employee_type'];
+            }
+            $empData['employee_type'] = $empType;
+
+            if($empData) require_once 'views/employee/show.php';
+            else { header("Location: index.php?action=employees"); exit(); }
+        } else { header("Location: index.php?action=employees"); exit(); }
+    }
+
+    public function edit() {
+        if(isset($_GET['id'])) {
+            $employeeModel = new Employee($this->db);
+            $empData = $employeeModel->readOne($_GET['id']);
+            
+            $deptModel = new Department($this->db);
+            $departments = $deptModel->readAll()->fetchAll(PDO::FETCH_ASSOC);
+
+            $levelModel = new PositionLevel($this->db);
+            $position_levels = $levelModel->readAll()->fetchAll(PDO::FETCH_ASSOC);
+            
+            $manpowerModel = new Manpower($this->db);
+            $manpowers = $manpowerModel->readAvailablePositions($empData['emp_code'])->fetchAll(PDO::FETCH_ASSOC);
+
+            if($empData) require_once 'views/employee/edit.php';
+            else { header("Location: index.php?action=employees"); exit(); }
+        } else { header("Location: index.php?action=employees"); exit(); }
+    }
+
+    public function update() {
+        if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['id'])) {
+            $employeeModel = new Employee($this->db);
+            $manpowerModel = new Manpower($this->db);
+            $id = $_POST['id'];
+            $national_id = trim($_POST['national_id'] ?? '');
+
+            // 🛑 ตรวจสอบเลขประจำตัวประชาชนซ้ำ (ยกเว้นของตัวเอง)
+            if (!empty($national_id) && $employeeModel->isNationalIdExists($national_id, $id)) {
+                $_SESSION['message'] = "เกิดข้อผิดพลาด! เลขประจำตัวประชาชน '{$national_id}' ซ้ำกับบุคลากรท่านอื่นในระบบ";
+                $_SESSION['message_type'] = "danger";
+                header("Location: index.php?action=edit&id=" . $id);
+                exit();
+            }
+
+            $oldData = $employeeModel->readOne($id);
+            $old_position = $oldData['emp_code'];
+            $new_position = trim($_POST['emp_code'] ?? '');
+
+            $avatar_filename = null;
+            if(isset($_FILES['avatar']) && $_FILES['avatar']['error'] == 0) {
+                $avatar_filename = $this->uploadAvatar($_FILES['avatar']);
+                if($avatar_filename && !empty($oldData['avatar']) && file_exists("uploads/" . $oldData['avatar'])) {
+                    unlink("uploads/" . $oldData['avatar']);
+                }
+            }
+
+            $data = [
+                'emp_code' => $new_position,
+                'national_id' => $national_id,
+                'prefix' => $_POST['prefix'] ?? '',
+                'gender' => $_POST['gender'] ?? '',
+                'dob' => trim($_POST['dob'] ?? ''),
+                'first_name' => trim($_POST['first_name'] ?? ''),
+                'last_name' => trim($_POST['last_name'] ?? ''),
+                'phone' => trim($_POST['phone'] ?? ''),
+                'email' => trim($_POST['email'] ?? ''),
+                'avatar' => $avatar_filename
+            ];
+
+            if($employeeModel->update($id, $data)) {
+                $this->saveRelations($employeeModel, $id, $_POST);
+
+                if($old_position !== $new_position) {
+                    if(!empty($old_position)) $manpowerModel->updateStatusByPositionNumber($old_position, 'vacant');
+                    if(!empty($new_position)) $manpowerModel->updateStatusByPositionNumber($new_position, 'occupied');
+                }
+
+                $_SESSION['message'] = "อัปเดตข้อมูลประวัติ (ก.พ. 7) สำเร็จ!";
+                $_SESSION['message_type'] = "success";
+                header("Location: index.php?action=employees");
+                exit();
+            } else {
+                $_SESSION['message'] = "เกิดข้อผิดพลาดในการแก้ไขข้อมูล!";
+                $_SESSION['message_type'] = "danger";
+                header("Location: index.php?action=edit&id=" . $id);
+                exit();
+            }
+        }
+    }
+
+    private function saveRelations($model, $emp_id, $postData) {
+        $familyData = ['father_name' => $postData['father_name'] ?? '', 'mother_name' => $postData['mother_name'] ?? '', 'spouse_name' => $postData['spouse_name'] ?? '', 'children_count' => (int)($postData['children_count'] ?? 0)];
+        $model->updateFamily($emp_id, $familyData);
+        if(isset($postData['edu_degree'])) $model->updateRelations("emp_education", $emp_id, [$postData['edu_degree'], $postData['edu_major'], $postData['edu_inst'], $postData['edu_year']], ['degree_level', 'major', 'institution', 'graduation_year']);
+        if(isset($postData['trn_course'])) $model->updateRelations("emp_training", $emp_id, [$postData['trn_course'], $postData['trn_inst'], $postData['trn_year']], ['course_name', 'institution', 'training_year']);
+        
+        if(isset($postData['wk_date'])) {
+            $model->updateRelations("emp_work_history", $emp_id, 
+                [$postData['wk_date'], $postData['wk_order'], $postData['wk_pos'], $postData['wk_num'], $postData['wk_level'], $postData['wk_salary'], $postData['wk_agency'], $postData['wk_dept']], 
+                ['start_date', 'order_number', 'position_name', 'position_number', 'level', 'salary', 'agency', 'department']);
+        }
+        
+        if(isset($postData['lv_year'])) $model->updateRelations("emp_leave", $emp_id, [$postData['lv_year'], $postData['lv_sick'], $postData['lv_personal'], $postData['lv_vacation'], $postData['lv_late']], ['leave_year', 'sick_leave', 'personal_leave', 'vacation_leave', 'late_count']);
+        if(isset($postData['act_pos'])) $model->updateRelations("emp_acting", $emp_id, [$postData['act_pos'], $postData['act_order'], $postData['act_date']], ['acting_position', 'order_number', 'start_date']);
+        if(isset($postData['ev_year'])) $model->updateRelations("emp_evaluation", $emp_id, [$postData['ev_year'], $postData['ev_round'], $postData['ev_score'], $postData['ev_level']], ['eval_year', 'eval_round', 'score_percent', 'result_level']);
+        if(isset($postData['dec_name'])) $model->updateRelations("emp_decoration", $emp_id, [$postData['dec_name'], $postData['dec_year'], $postData['dec_info']], ['decor_name', 'received_year', 'gazette_info']);
+        if(isset($postData['dis_date'])) $model->updateRelations("emp_disciplinary", $emp_id, [$postData['dis_date'], $postData['dis_type'], $postData['dis_desc']], ['incident_date', 'punishment_type', 'description']);
+        if(isset($postData['lic_name'])) $model->updateRelations("emp_license", $emp_id, [$postData['lic_name'], $postData['lic_num'], $postData['lic_issue'], $postData['lic_expire']], ['license_name', 'license_number', 'issue_date', 'expiry_date']);
+    }
+
+    public function delete() {
+        if(isset($_GET['id'])) {
+            $employeeModel = new Employee($this->db);
+            $manpowerModel = new Manpower($this->db);
+            $id = $_GET['id'];
+            $empData = $employeeModel->readOne($id);
+            $position_to_free = $empData['emp_code'];
+
+            if(!empty($empData['avatar']) && file_exists("uploads/" . $empData['avatar'])) {
+                unlink("uploads/" . $empData['avatar']);
+            }
+            if($employeeModel->delete($id)) {
+                if(!empty($position_to_free)) {
+                    $manpowerModel->updateStatusByPositionNumber($position_to_free, 'vacant');
+                }
+                $_SESSION['message'] = "ลบข้อมูลประวัติ และคืนกรอบอัตรากำลังสำเร็จ!"; 
+                $_SESSION['message_type'] = "success";
+            }
+            header("Location: index.php?action=employees"); exit();
+        }
+    }
+
+    public function exportExcel() {}
+}
+?>
