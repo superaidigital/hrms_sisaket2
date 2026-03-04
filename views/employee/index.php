@@ -101,7 +101,7 @@
                             <i class="fa-solid fa-user-clock"></i>
                         </button>
                         
-                        <a href="index.php?action=employee_show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold me-1" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
+                        <a href="index.php?action=show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold me-1" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
                             <i class="fa-solid fa-eye"></i>
                         </a>
                         <a href="index.php?action=edit&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-primary border me-1" title="แก้ไขข้อมูล">
