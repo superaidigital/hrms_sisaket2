@@ -77,7 +77,7 @@
                         </span>
                     </td>
                     <td class="text-end pe-3">
-                        <a href="index.php?action=employee_show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
+                        <a href="index.php?action=show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
                             <i class="fa-solid fa-eye"></i>
                         </a>
                         <a href="index.php?action=edit&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-primary border" title="แก้ไขข้อมูล">
