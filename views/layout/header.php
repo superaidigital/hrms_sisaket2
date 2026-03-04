@@ -262,6 +262,12 @@
                         <i class="fa-solid fa-sitemap"></i> <span class="menu-text">กรอบอัตรากำลัง</span>
                     </a>
                 </li>
+                <li class="nav-item <?= (isset($_GET['action']) && $_GET['action'] == 'manpower_summary') ? 'active' : '' ?>">
+                    <a class="nav-link" href="index.php?action=manpower_summary">
+                        <i class="fas fa-fw fa-chart-pie"></i>
+                        <span>อัตรากำลังแยกส่วน</span>
+                    </a>
+                </li>
                 <li class="mt-4 pt-4 border-top border-secondary border-opacity-25">
                     <a href="index.php?action=settings" class="<?php echo (in_array($currentAction, ['settings', 'users', 'departments', 'position_levels', 'menus'])) ? 'active' : ''; ?>" title="ตั้งค่าระบบ">
                         <i class="fa-solid fa-gear"></i> <span class="menu-text">ตั้งค่าระบบ</span>

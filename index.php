@@ -163,6 +163,13 @@ switch ($action) {
         $manpower = new ManpowerController($db);
         $manpower->storeAjax();
         break;
+        
+    case 'manpower_summary':
+        require_once 'controllers/ManpowerController.php';
+        // หากระบบของคุณมีการส่ง $db เข้าไป ให้ใส่ $db ด้วย เช่น new ManpowerController($db)
+        $controller = new ManpowerController($db); 
+        $controller->summaryReport();
+        break;
 
     // ---- ตั้งค่า: หน่วยงาน (Departments) ----
     case 'departments':

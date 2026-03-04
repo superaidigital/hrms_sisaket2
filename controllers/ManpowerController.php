@@ -351,5 +351,61 @@ class ManpowerController {
         }
         exit();
     }
+
+    // =========================================================
+    // 🌟 ฟังก์ชันใหม่: รายงานสรุปอัตรากำลังแยกประเภท (ส่วนกลาง, สถานศึกษา, สาธารณสุข)
+    // =========================================================
+    public function summaryReport() {
+        // รับค่าปีงบประมาณเพื่อไปแสดงที่ View (หรือซ่อนไว้ถ้าไม่ใช้)
+        $year = isset($_GET['year']) ? $_GET['year'] : (date('Y') + 543);
+
+        // ดึงข้อมูลจัดกลุ่มตามหน่วยงานจากตาราง manpower ตรงๆ ตามหลักการทำงานเดิมของคุณ
+        $sql = "
+            SELECT 
+                department AS department_name,
+                CASE 
+                    WHEN department LIKE '%โรงเรียน%' OR department LIKE '%วิทยาลัย%' THEN 'school'
+                    WHEN department LIKE '%รพ.สต.%' OR department LIKE '%โรงพยาบาล%' OR department LIKE '%อนามัย%' OR department LIKE '%สาธารณสุข%' THEN 'health'
+                    ELSE 'central'
+                END AS dept_type,
+                COUNT(id) AS framework_count,
+                SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) AS actual_count
+            FROM manpower
+            GROUP BY department
+            ORDER BY department ASC
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // จัดกลุ่มข้อมูล
+        $central = []; 
+        $school = []; 
+        $health = [];
+        $total_fw = 0; 
+        $total_actual = 0;
+
+        foreach($data as $row) {
+            $total_fw += $row['framework_count'];
+            $total_actual += $row['actual_count'];
+
+            if($row['dept_type'] == 'school') {
+                $school[] = $row;
+            } elseif($row['dept_type'] == 'health') {
+                $health[] = $row;
+            } else {
+                $central[] = $row;
+            }
+        }
+
+        $current_controller = 'manpower';
+        $current_action = 'summaryReport';
+
+        // เรียกใช้งาน View
+        require_once 'views/layout/header.php';
+        require_once 'views/manpower/summary_report.php';
+        require_once 'views/layout/footer.php';
+    }
 }
 ?>

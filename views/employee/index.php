@@ -46,7 +46,7 @@
             </form>
         </div>
         <div class="col-md-4 col-lg-6 text-md-end mt-2 mt-md-0 pt-2">
-            <span class="text-muted small fw-bold">พบข้อมูลทั้งหมด: <span class="text-teal"><?php echo $total_rows; ?></span> รายการ</span>
+            <span class="text-muted small fw-bold">พบข้อมูลทั้งหมด: <span class="text-teal"><?php echo $total_rows ?? 0; ?></span> รายการ</span>
         </div>
     </div>
 
@@ -58,141 +58,175 @@
                     <th class="ps-3">ข้อมูลบุคลากร</th>
                     <th>สายงาน / ระดับ</th>
                     <th>สังกัด</th>
-                    <th class="text-center">สถานะ</th>
+                    <th class="text-center" width="160px">สถานะ</th>
                     <th class="text-end pe-3">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach($employees as $emp): ?>
-                <tr>
-                    <td class="ps-3">
-                        <div class="d-flex align-items-center">
-                            <img src="https://ui-avatars.com/api/?name=<?php echo urlencode($emp['first_name']); ?>&background=14b8a6&color=fff" class="rounded-circle me-3" width="45" height="45">
-                            <div>
-                                <div class="fw-bold text-dark"><?php echo $emp['prefix'] . $emp['first_name'] . ' ' . $emp['last_name']; ?></div>
-                                <div class="text-muted" style="font-size: 0.8rem;"><?php echo $emp['emp_code']; ?></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="fw-semibold text-dark"><?php echo $emp['position']; ?></div>
-                        <div class="text-muted" style="font-size: 0.8rem;"><span class="text-teal" style="color: #0d9488;"><?php echo $emp['level'] ? $emp['level'] : '-'; ?></span> | <?php echo $emp['employee_type']; ?></div>
-                    </td>
-                    <td>
-                        <div class="text-secondary fw-medium"><?php echo $emp['department']; ?></div>
-                    </td>
-                    <td class="text-center">
-                        <?php 
-                        // กำหนดสีของป้ายสถานะ (Badge)
-                        $status_bg = 'bg-success-subtle text-success border-success-subtle';
-                        if($emp['status'] == 'ปฏิบัติงาน') $status_bg = 'bg-success-subtle text-success border-success-subtle';
-                        elseif($emp['status'] == 'ช่วยราชการ') $status_bg = 'bg-info-subtle text-info border-info-subtle';
-                        elseif($emp['status'] == 'ลาศึกษาต่อ') $status_bg = 'bg-primary-subtle text-primary border-primary-subtle';
-                        elseif(in_array($emp['status'], ['ลาออก', 'เกษียณอายุ', 'โอนย้าย'])) $status_bg = 'bg-secondary-subtle text-secondary border-secondary-subtle';
-                        elseif(in_array($emp['status'], ['ถูกพักราชการ', 'เสียชีวิต'])) $status_bg = 'bg-danger-subtle text-danger border-danger-subtle';
-                        ?>
-                        <span class="badge rounded-pill px-3 py-2 border <?php echo $status_bg; ?>">
-                            <?php echo $emp['status'] ? $emp['status'] : 'ปฏิบัติงาน'; ?>
-                        </span>
-                    </td>
-                    <td class="text-end pe-3">
-                        <!-- ปุ่มจัดการสถานะ (เปิด Modal) -->
-                        <button type="button" class="btn btn-sm btn-light text-warning border fw-bold me-1" data-bs-toggle="modal" data-bs-target="#statusModal<?php echo $emp['id']; ?>" title="จัดการสถานะ">
-                            <i class="fa-solid fa-user-clock"></i>
-                        </button>
-                        
-                        <a href="index.php?action=show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold me-1" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
-                            <i class="fa-solid fa-eye"></i>
-                        </a>
-                        <a href="index.php?action=edit&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-primary border me-1" title="แก้ไขข้อมูล">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </a>
-                        <a href="index.php?action=delete&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-danger border" onclick="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลของคุณ <?php echo $emp['first_name']; ?>?');" title="ลบข้อมูล">
-                            <i class="fa-solid fa-trash"></i>
-                        </a>
-
-                        <!-- Modal จัดการสถานะ -->
-                        <div class="modal fade" id="statusModal<?php echo $emp['id']; ?>" tabindex="-1" aria-labelledby="statusModalLabel<?php echo $emp['id']; ?>" aria-hidden="true">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <form action="index.php?action=update_status" method="POST">
-                                        <div class="modal-header bg-light">
-                                            <h5 class="modal-title" id="statusModalLabel<?php echo $emp['id']; ?>">
-                                                <i class="fa-solid fa-user-clock text-warning me-2"></i>อัปเดตสถานะบุคลากร
-                                            </h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body text-start">
-                                            <input type="hidden" name="id" value="<?php echo $emp['id']; ?>">
-                                            <p class="mb-3"><strong>บุคลากร:</strong> <?php echo $emp['prefix'] . $emp['first_name'] . ' ' . $emp['last_name']; ?></p>
-                                            
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold">เลือกสถานะปัจจุบัน</label>
-                                                <select name="status" class="form-select">
-                                                    <option value="ปฏิบัติงาน" <?php echo $emp['status'] == 'ปฏิบัติงาน' ? 'selected' : ''; ?>>ปฏิบัติงาน</option>
-                                                    <option value="ช่วยราชการ" <?php echo $emp['status'] == 'ช่วยราชการ' ? 'selected' : ''; ?>>ช่วยราชการ</option>
-                                                    <option value="ลาศึกษาต่อ" <?php echo $emp['status'] == 'ลาศึกษาต่อ' ? 'selected' : ''; ?>>ลาศึกษาต่อ</option>
-                                                    <option value="ถูกพักราชการ" <?php echo $emp['status'] == 'ถูกพักราชการ' ? 'selected' : ''; ?>>ถูกพักราชการ</option>
-                                                    <option value="เกษียณอายุ" <?php echo $emp['status'] == 'เกษียณอายุ' ? 'selected' : ''; ?>>เกษียณอายุ</option>
-                                                    <option value="ลาออก" <?php echo $emp['status'] == 'ลาออก' ? 'selected' : ''; ?>>ลาออก</option>
-                                                    <option value="โอนย้าย" <?php echo $emp['status'] == 'โอนย้าย' ? 'selected' : ''; ?>>โอนย้าย</option>
-                                                    <option value="เสียชีวิต" <?php echo $emp['status'] == 'เสียชีวิต' ? 'selected' : ''; ?>>เสียชีวิต</option>
-                                                </select>
-                                                <small class="text-danger mt-2 d-block">* หากเลือกสถานะ ลาออก, เกษียณอายุ, โอนย้าย หรือ เสียชีวิต ระบบจะคืนกรอบอัตรากำลังให้ว่างโดยอัตโนมัติ</small>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                                            <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
-                                        </div>
-                                    </form>
+                <?php if(!empty($employees)): ?>
+                    <?php foreach($employees as $emp): ?>
+                    <tr>
+                        <td class="ps-3">
+                            <div class="d-flex align-items-center">
+                                <img src="https://ui-avatars.com/api/?name=<?php echo urlencode($emp['first_name'] ?? 'User'); ?>&background=14b8a6&color=fff" class="rounded-circle me-3" width="45" height="45">
+                                <div>
+                                    <div class="fw-bold text-dark"><?php echo ($emp['prefix'] ?? '') . ($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''); ?></div>
+                                    <div class="text-muted" style="font-size: 0.8rem;"><?php echo $emp['emp_code'] ?? '-'; ?></div>
                                 </div>
                             </div>
-                        </div>
-
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-
-                <?php if(empty($employees)): ?>
-                <tr>
-                    <td colspan="5" class="text-center py-5 text-muted">
-                        <i class="fa-solid fa-folder-open fs-1 text-light mb-3 d-block"></i>
-                        ไม่พบข้อมูลบุคลากรที่คุณค้นหา
-                    </td>
-                </tr>
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark"><?php echo $emp['position'] ?? '-'; ?></div>
+                            <div class="text-muted" style="font-size: 0.8rem;"><span class="text-teal" style="color: #0d9488;"><?php echo !empty($emp['level']) ? $emp['level'] : '-'; ?></span> | <?php echo $emp['employee_type'] ?? '-'; ?></div>
+                        </td>
+                        <td>
+                            <div class="text-secondary fw-medium"><?php echo $emp['department'] ?? '-'; ?></div>
+                        </td>
+                        <td class="text-center">
+                            <?php 
+                            // กำหนดคลาสสีเริ่มต้นสำหรับ Dropdown ตามสถานะปัจจุบัน
+                            $current_status = !empty($emp['status']) ? $emp['status'] : 'ปฏิบัติงาน';
+                            $select_class = 'bg-secondary-subtle text-secondary border-secondary-subtle';
+                            
+                            if($current_status == 'ปฏิบัติงาน') $select_class = 'bg-success-subtle text-success border-success-subtle';
+                            elseif($current_status == 'ช่วยราชการ') $select_class = 'bg-info-subtle text-info border-info-subtle';
+                            elseif($current_status == 'ลาศึกษาต่อ') $select_class = 'bg-primary-subtle text-primary border-primary-subtle';
+                            elseif(in_array($current_status, ['ลาออก', 'เกษียณอายุ', 'โอนย้าย'])) $select_class = 'bg-secondary-subtle text-secondary border-secondary-subtle';
+                            elseif(in_array($current_status, ['ถูกพักราชการ', 'เสียชีวิต'])) $select_class = 'bg-danger-subtle text-danger border-danger-subtle';
+                            ?>
+                            
+                            <!-- เปลี่ยน Badge เป็น Select Dropdown (Interactive) -->
+                            <select class="form-select form-select-sm rounded-pill border fw-bold text-center status-ajax-dropdown <?php echo $select_class; ?>" data-id="<?php echo $emp['id']; ?>" style="cursor: pointer; font-size: 0.85rem; padding-top: 0.25rem; padding-bottom: 0.25rem;">
+                                <option value="ปฏิบัติงาน" <?php echo $current_status == 'ปฏิบัติงาน' ? 'selected' : ''; ?> class="bg-white text-dark">ปฏิบัติงาน</option>
+                                <option value="ช่วยราชการ" <?php echo $current_status == 'ช่วยราชการ' ? 'selected' : ''; ?> class="bg-white text-dark">ช่วยราชการ</option>
+                                <option value="ลาศึกษาต่อ" <?php echo $current_status == 'ลาศึกษาต่อ' ? 'selected' : ''; ?> class="bg-white text-dark">ลาศึกษาต่อ</option>
+                                <option value="ถูกพักราชการ" <?php echo $current_status == 'ถูกพักราชการ' ? 'selected' : ''; ?> class="bg-white text-dark">ถูกพักราชการ</option>
+                                <option value="เกษียณอายุ" <?php echo $current_status == 'เกษียณอายุ' ? 'selected' : ''; ?> class="bg-white text-dark">เกษียณอายุ</option>
+                                <option value="ลาออก" <?php echo $current_status == 'ลาออก' ? 'selected' : ''; ?> class="bg-white text-dark">ลาออก</option>
+                                <option value="โอนย้าย" <?php echo $current_status == 'โอนย้าย' ? 'selected' : ''; ?> class="bg-white text-dark">โอนย้าย</option>
+                                <option value="เสียชีวิต" <?php echo $current_status == 'เสียชีวิต' ? 'selected' : ''; ?> class="bg-white text-dark">เสียชีวิต</option>
+                            </select>
+                        </td>
+                        <td class="text-end pe-3">
+                            <!-- เอาปุ่มเปิด Modal ออก เพราะเราใช้ Dropdown แก้สถานะได้เลย -->
+                            <a href="index.php?action=show&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-teal border border-teal-200 fw-bold me-1" style="color: #0d9488; background-color:#f0fdfa;" title="ดูประวัติ">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                            <a href="index.php?action=edit&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-primary border me-1" title="แก้ไขข้อมูล">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+                            <a href="index.php?action=delete&id=<?php echo $emp['id']; ?>" class="btn btn-sm btn-light text-danger border" onclick="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลของคุณ <?php echo $emp['first_name']; ?>?');" title="ลบข้อมูล">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-folder-open fs-1 text-light mb-3 d-block"></i>
+                            ไม่พบข้อมูลบุคลากรที่คุณค้นหา
+                        </td>
+                    </tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <!-- ส่วนแบ่งหน้า (Pagination) -->
-    <?php if($total_pages > 1): ?>
+    <?php if(isset($total_pages) && $total_pages > 1): ?>
     <?php 
         $search_query = ""; 
-        if(!empty($search_term)) $search_query .= "&search=" . urlencode($search_term);
-        if(!empty($dept_type)) $search_query .= "&dept_type=" . urlencode($dept_type);
+        if(!empty($_GET['search'])) $search_query .= "&search=" . urlencode($_GET['search']);
+        if(!empty($_GET['dept_type'])) $search_query .= "&dept_type=" . urlencode($_GET['dept_type']);
+        $current_page = isset($page) ? $page : 1;
     ?>
     <nav aria-label="Page navigation" class="mt-4 pt-3 border-top">
         <ul class="pagination justify-content-center mb-0">
-            <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                <a class="page-link text-teal" href="index.php?action=employees&page=<?php echo $page - 1; ?><?php echo $search_query; ?>">ก่อนหน้า</a>
+            <li class="page-item <?php echo $current_page <= 1 ? 'disabled' : ''; ?>">
+                <a class="page-link text-teal" href="index.php?action=employees&page=<?php echo $current_page - 1; ?><?php echo $search_query; ?>">ก่อนหน้า</a>
             </li>
             
             <?php for($i = 1; $i <= $total_pages; $i++): ?>
-                <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
-                    <a class="page-link <?php echo $page == $i ? 'text-white' : 'text-teal'; ?>" 
-                       style="<?php echo $page == $i ? 'background-color: #0d9488; border-color: #0d9488;' : ''; ?>"
+                <li class="page-item <?php echo $current_page == $i ? 'active' : ''; ?>">
+                    <a class="page-link <?php echo $current_page == $i ? 'text-white' : 'text-teal'; ?>" 
+                       style="<?php echo $current_page == $i ? 'background-color: #0d9488; border-color: #0d9488;' : ''; ?>"
                        href="index.php?action=employees&page=<?php echo $i; ?><?php echo $search_query; ?>"><?php echo $i; ?></a>
                 </li>
             <?php endfor; ?>
             
-            <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
-                <a class="page-link text-teal" href="index.php?action=employees&page=<?php echo $page + 1; ?><?php echo $search_query; ?>">ถัดไป</a>
+            <li class="page-item <?php echo $current_page >= $total_pages ? 'disabled' : ''; ?>">
+                <a class="page-link text-teal" href="index.php?action=employees&page=<?php echo $current_page + 1; ?><?php echo $search_query; ?>">ถัดไป</a>
             </li>
         </ul>
     </nav>
     <?php endif; ?>
 </div>
+
+<!-- สคริปต์ AJAX สำหรับเปลี่ยนสถานะแบบ Real-time -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // รอจนกว่าหน้าเว็บจะโหลด jQuery เสร็จ
+    var checkJq = setInterval(function() {
+        if (window.jQuery) {
+            clearInterval(checkJq);
+            var $ = window.jQuery;
+
+            // เมื่อมีการเปลี่ยนค่าใน Dropdown สถานะ
+            $(document).on('change', '.status-ajax-dropdown', function() {
+                var dropdown = $(this);
+                var empId = dropdown.data('id');
+                var newStatus = dropdown.val();
+                
+                // 1. ลบคลาสสีเก่าออกทั้งหมด
+                dropdown.removeClass('bg-success-subtle text-success border-success-subtle bg-info-subtle text-info border-info-subtle bg-primary-subtle text-primary border-primary-subtle bg-secondary-subtle text-secondary border-secondary-subtle bg-danger-subtle text-danger border-danger-subtle');
+                
+                // 2. ใส่คลาสสีใหม่เข้าไปทันทีตามสถานะที่เลือก
+                if(newStatus === 'ปฏิบัติงาน') dropdown.addClass('bg-success-subtle text-success border-success-subtle');
+                else if(newStatus === 'ช่วยราชการ') dropdown.addClass('bg-info-subtle text-info border-info-subtle');
+                else if(newStatus === 'ลาศึกษาต่อ') dropdown.addClass('bg-primary-subtle text-primary border-primary-subtle');
+                else if(['ลาออก', 'เกษียณอายุ', 'โอนย้าย'].includes(newStatus)) dropdown.addClass('bg-secondary-subtle text-secondary border-secondary-subtle');
+                else if(['ถูกพักราชการ', 'เสียชีวิต'].includes(newStatus)) dropdown.addClass('bg-danger-subtle text-danger border-danger-subtle');
+
+                // ปิดการใช้งาน dropdown ชั่วคราวระหว่างรอเซิร์ฟเวอร์ตอบกลับ
+                dropdown.prop('disabled', true);
+
+                // 3. ส่งข้อมูลไปอัปเดตที่หลังบ้านด้วย AJAX
+                $.ajax({
+                    // ตรงนี้จะต้องตรงกับ route ในไฟล์ index.php ของคุณ (แนะนำให้ใช้ route ที่คืนค่าเป็น JSON)
+                    url: 'index.php?action=employee_update_status', 
+                    type: 'POST',
+                    data: {
+                        id: empId,
+                        status: newStatus
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        dropdown.prop('disabled', false); // เปิดให้ใช้งานต่อ
+                        if(response.status === 'success') {
+                            // ถ้ามี SweetAlert2 ในระบบให้แสดงสวยๆ
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'อัปเดตสถานะสำเร็จ',
+                                    text: 'สถานะถูกเปลี่ยนเป็น: ' + newStatus,
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                });
+                            }
+                        } else {
+                            alert('ผิดพลาด: ' + (response.message || 'ไม่สามารถอัปเดตข้อมูลได้'));
+                        }
+                    },
+                    error: function() {
+                        dropdown.prop('disabled', false);
+                        alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+                    }
+                });
+            });
+        }
+    }, 100);
+});
+</script>
 
 <?php include 'views/layout/footer.php'; ?>
