@@ -37,38 +37,56 @@ class EmployeeController {
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         if($page < 1) $page = 1;
         $from_record_num = ($records_per_page * $page) - $records_per_page;
-        $search_term = isset($_GET['search']) ? trim($_GET['search']) : "";
         
-        $query = "SELECT e.*, w.position_name AS position, w.department, w.level, m.employee_type 
+        $search_term = isset($_GET['search']) ? trim($_GET['search']) : "";
+        $dept_type = isset($_GET['dept_type']) ? trim($_GET['dept_type']) : "";
+        
+        // ดึงประเภทส่วนราชการมาแสดงใน Dropdown
+        $stmt_types = $this->db->prepare("SELECT DISTINCT type FROM departments WHERE type IS NOT NULL AND type != ''");
+        $stmt_types->execute();
+        $department_types = $stmt_types->fetchAll(PDO::FETCH_ASSOC);
+
+        $query = "SELECT e.*, w.position_name AS position, w.department, w.level, m.employee_type, d.type as department_type 
                   FROM employees e
                   LEFT JOIN emp_work_history w ON w.id = (
                       SELECT id FROM emp_work_history WHERE employee_id = e.id ORDER BY id DESC LIMIT 1
                   )
-                  LEFT JOIN manpower m ON m.position_number COLLATE utf8mb4_unicode_ci = e.emp_code COLLATE utf8mb4_unicode_ci";
+                  LEFT JOIN manpower m ON m.position_number COLLATE utf8mb4_unicode_ci = e.emp_code COLLATE utf8mb4_unicode_ci
+                  LEFT JOIN departments d ON w.department = d.name";
+                  
+        $where_clauses = [];
+        $params = [];
         
         if(!empty($search_term)) {
-            $query .= " WHERE e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ? OR w.position_name LIKE ?";
+            $where_clauses[] = "(e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ? OR w.position_name LIKE ?)";
+            $search_param = "%{$search_term}%";
+            array_push($params, $search_param, $search_param, $search_param, $search_param);
         }
+        
+        if(!empty($dept_type)) {
+            $where_clauses[] = "d.type = ?";
+            $params[] = $dept_type;
+        }
+
+        if(!empty($where_clauses)) {
+            $query .= " WHERE " . implode(" AND ", $where_clauses);
+        }
+        
         $query .= " ORDER BY e.id DESC LIMIT ?, ?";
         
         $stmt = $this->db->prepare($query);
         
-        if(!empty($search_term)) {
-            $search_param = "%{$search_term}%";
-            $stmt->bindParam(1, $search_param);
-            $stmt->bindParam(2, $search_param);
-            $stmt->bindParam(3, $search_param);
-            $stmt->bindParam(4, $search_param);
-            $stmt->bindParam(5, $from_record_num, PDO::PARAM_INT);
-            $stmt->bindParam(6, $records_per_page, PDO::PARAM_INT);
-        } else {
-            $stmt->bindParam(1, $from_record_num, PDO::PARAM_INT);
-            $stmt->bindParam(2, $records_per_page, PDO::PARAM_INT);
+        $param_index = 1;
+        foreach($params as $param) {
+            $stmt->bindValue($param_index++, $param);
         }
+        $stmt->bindValue($param_index++, $from_record_num, PDO::PARAM_INT);
+        $stmt->bindValue($param_index, $records_per_page, PDO::PARAM_INT);
+        
         $stmt->execute();
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $total_rows = $employeeModel->countAll($search_term);
+        $total_rows = $employeeModel->countAll($search_term, $dept_type);
         $total_pages = ceil($total_rows / $records_per_page);
 
         require_once 'views/employee/index.php';
@@ -94,7 +112,6 @@ class EmployeeController {
 
             $national_id = trim($_POST['national_id'] ?? '');
 
-            // 🛑 ตรวจสอบเลขประจำตัวประชาชนซ้ำ
             if (!empty($national_id) && $employeeModel->isNationalIdExists($national_id)) {
                 $_SESSION['message'] = "เกิดข้อผิดพลาด! เลขประจำตัวประชาชน '{$national_id}' มีประวัติอยู่ในระบบแล้ว";
                 $_SESSION['message_type'] = "danger";
@@ -187,7 +204,6 @@ class EmployeeController {
             $id = $_POST['id'];
             $national_id = trim($_POST['national_id'] ?? '');
 
-            // 🛑 ตรวจสอบเลขประจำตัวประชาชนซ้ำ (ยกเว้นของตัวเอง)
             if (!empty($national_id) && $employeeModel->isNationalIdExists($national_id, $id)) {
                 $_SESSION['message'] = "เกิดข้อผิดพลาด! เลขประจำตัวประชาชน '{$national_id}' ซ้ำกับบุคลากรท่านอื่นในระบบ";
                 $_SESSION['message_type'] = "danger";
@@ -259,6 +275,33 @@ class EmployeeController {
         if(isset($postData['dec_name'])) $model->updateRelations("emp_decoration", $emp_id, [$postData['dec_name'], $postData['dec_year'], $postData['dec_info']], ['decor_name', 'received_year', 'gazette_info']);
         if(isset($postData['dis_date'])) $model->updateRelations("emp_disciplinary", $emp_id, [$postData['dis_date'], $postData['dis_type'], $postData['dis_desc']], ['incident_date', 'punishment_type', 'description']);
         if(isset($postData['lic_name'])) $model->updateRelations("emp_license", $emp_id, [$postData['lic_name'], $postData['lic_num'], $postData['lic_issue'], $postData['lic_expire']], ['license_name', 'license_number', 'issue_date', 'expiry_date']);
+    }
+
+    public function updateStatus() {
+        if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['id'])) {
+            $employeeModel = new Employee($this->db);
+            $id = $_POST['id'];
+            $status = $_POST['status'];
+
+            if ($employeeModel->updateStatus($id, $status)) {
+                // หากสถานะคือ ลาออก, เกษียณอายุ, โอนย้าย หรือเสียชีวิต ให้คืนกรอบอัตรากำลังเป็น vacant
+                if (in_array($status, ['ลาออก', 'เกษียณอายุ', 'โอนย้าย', 'เสียชีวิต'])) {
+                    $manpowerModel = new Manpower($this->db);
+                    $empData = $employeeModel->readOne($id);
+                    if (!empty($empData['emp_code'])) {
+                        $manpowerModel->updateStatusByPositionNumber($empData['emp_code'], 'vacant');
+                    }
+                }
+                
+                $_SESSION['message'] = "อัปเดตสถานะบุคลากรสำเร็จ!";
+                $_SESSION['message_type'] = "success";
+            } else {
+                $_SESSION['message'] = "เกิดข้อผิดพลาดในการอัปเดตสถานะ!";
+                $_SESSION['message_type'] = "danger";
+            }
+            header("Location: index.php?action=employees");
+            exit();
+        }
     }
 
     public function delete() {

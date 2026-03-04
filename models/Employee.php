@@ -12,7 +12,6 @@ class Employee {
         $this->conn = $db;
     }
 
-    // ✅ เพิ่มฟังก์ชันตรวจสอบ เลขประจำตัวประชาชน ซ้ำ
     public function isNationalIdExists($national_id, $exclude_id = null) {
         $query = "SELECT id FROM " . $this->table_name . " WHERE national_id = ?";
         if ($exclude_id) {
@@ -71,23 +70,38 @@ class Employee {
         return $stmt;
     }
 
-    public function countAll($search_term = "") {
+    public function countAll($search_term = "", $dept_type = "") {
         $query = "SELECT e.id FROM " . $this->table_name . " e
                   LEFT JOIN emp_work_history w ON w.id = (
                       SELECT id FROM emp_work_history WHERE employee_id = e.id ORDER BY id DESC LIMIT 1
-                  )";
+                  )
+                  LEFT JOIN departments d ON w.department = d.name";
                   
+        $where_clauses = [];
+        $params = [];
+        
         if(!empty($search_term)) {
-            $query .= " WHERE e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ? OR w.position_name LIKE ?";
-        }
-        $stmt = $this->conn->prepare($query);
-        if(!empty($search_term)) {
+            $where_clauses[] = "(e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ? OR w.position_name LIKE ?)";
             $search_param = "%{$search_term}%";
-            $stmt->bindParam(1, $search_param);
-            $stmt->bindParam(2, $search_param);
-            $stmt->bindParam(3, $search_param);
-            $stmt->bindParam(4, $search_param);
+            array_push($params, $search_param, $search_param, $search_param, $search_param);
         }
+        
+        if(!empty($dept_type)) {
+            $where_clauses[] = "d.type = ?";
+            $params[] = $dept_type;
+        }
+
+        if(!empty($where_clauses)) {
+            $query .= " WHERE " . implode(" AND ", $where_clauses);
+        }
+        
+        $stmt = $this->conn->prepare($query);
+        
+        $param_index = 1;
+        foreach($params as $param) {
+            $stmt->bindValue($param_index++, $param);
+        }
+        
         $stmt->execute();
         return $stmt->rowCount();
     }
@@ -176,6 +190,14 @@ class Employee {
             $stmt->bindParam(":avatar", $data['avatar']);
         }
 
+        return $stmt->execute();
+    }
+
+    public function updateStatus($id, $status) {
+        $query = "UPDATE " . $this->table_name . " SET status = :status WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":status", $status);
+        $stmt->bindParam(":id", $id);
         return $stmt->execute();
     }
 
