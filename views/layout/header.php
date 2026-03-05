@@ -1,3 +1,39 @@
+<?php
+// ตรวจสอบการเปิด Session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// โหลด Model SystemMenu สำหรับทำ Dynamic Sidebar
+require_once __DIR__ . '/../../models/SystemMenu.php';
+
+// ดึงตัวแปรการเชื่อมต่อฐานข้อมูล (รองรับทั้งการเรียกจาก Controller และ Global)
+$databaseConn = isset($this->db) ? $this->db : (isset($db) ? $db : null);
+
+$menus_tree = [];
+if ($databaseConn) {
+    $menuObj = new SystemMenu($databaseConn);
+    // ตรวจสอบสิทธิ์ผู้ใช้จาก Session (ถ้ายังไม่ล็อกอินให้เป็น guest หรือ user)
+    $userRole = isset($_SESSION['user_role']) ? $_SESSION['user_role'] : (isset($_SESSION['role']) ? $_SESSION['role'] : 'user'); 
+    
+    // ดึงเฉพาะเมนูที่ Active และตรงกับสิทธิ์
+    $activeMenus = $menuObj->readActive($userRole)->fetchAll(PDO::FETCH_ASSOC);
+
+    // จัดกลุ่มเมนูหลักและเมนูย่อย
+    foreach($activeMenus as $item) {
+        if($item['parent_id'] == 0) {
+            $menus_tree[$item['id']] = $item;
+            $menus_tree[$item['id']]['sub_menus'] = [];
+        } else {
+            if(isset($menus_tree[$item['parent_id']])) {
+                $menus_tree[$item['parent_id']]['sub_menus'][] = $item;
+            }
+        }
+    }
+}
+
+$currentAction = $_GET['action'] ?? 'dashboard';
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -239,42 +275,50 @@
                 <span class="badge bg-white bg-opacity-10 text-light mt-3 rounded-pill px-3 py-1 border border-light border-opacity-10" style="letter-spacing: 1px; font-size: 0.65rem;">องค์การบริหารส่วนจังหวัดศรีสะเกษ</span>
             </div>
 
-            <?php $currentAction = $_GET['action'] ?? 'dashboard'; ?>
+            <ul class="sidebar-nav d-flex flex-column h-100">
+                <?php foreach($menus_tree as $mainMenu): ?>
+                    
+                    <?php if(empty($mainMenu['sub_menus'])): ?>
+                        <!-- เมนูหลักที่ไม่มีเมนูย่อย -->
+                        <li>
+                            <a href="index.php?action=<?= $mainMenu['action_name']; ?>" 
+                               class="<?= ($currentAction == $mainMenu['action_name']) ? 'active' : ''; ?>" title="<?= $mainMenu['menu_name']; ?>">
+                                <i class="fa-solid <?= $mainMenu['icon']; ?>"></i> <span class="menu-text"><?= $mainMenu['menu_name']; ?></span>
+                            </a>
+                        </li>
+                    <?php else: ?>
+                        <!-- เมนูหลักที่มีเมนูย่อย (Dropdown) -->
+                        <?php 
+                            // เช็คว่าเมนูย่อยตัวไหนกำลังถูกเลือกอยู่ (เพื่อขยาย dropdown อัตโนมัติ)
+                            $isSubActive = in_array($currentAction, array_column($mainMenu['sub_menus'], 'action_name')); 
+                        ?>
+                        <li>
+                            <a href="#submenu-<?= $mainMenu['id']; ?>" data-bs-toggle="collapse" 
+                               class="justify-content-between <?= $isSubActive ? 'active' : ''; ?>" title="<?= $mainMenu['menu_name']; ?>">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa-solid <?= $mainMenu['icon']; ?>"></i> <span class="menu-text"><?= $mainMenu['menu_name']; ?></span>
+                                </div>
+                                <!-- ใส่คลาส menu-text ไว้ที่ลูกศรด้วย เพื่อให้ถูกซ่อนอัตโนมัติเมื่อ Sidebar พับ -->
+                                <i class="fa-solid fa-chevron-down fs-7 opacity-75 menu-text" style="width: auto; margin-right: 0;"></i>
+                            </a>
+                            <ul class="collapse list-unstyled <?= $isSubActive ? 'show' : ''; ?> mt-2 mb-2 p-2" id="submenu-<?= $mainMenu['id']; ?>" style="background: rgba(0,0,0,0.2); border-radius: 1rem;">
+                                <?php foreach($mainMenu['sub_menus'] as $subMenu): ?>
+                                <li>
+                                    <a href="index.php?action=<?= $subMenu['action_name']; ?>" 
+                                       class="<?= ($currentAction == $subMenu['action_name']) ? 'text-white bg-white bg-opacity-10' : 'text-muted'; ?>" 
+                                       style="padding: 0.65rem 1rem; font-size: 0.9rem;" title="<?= $subMenu['menu_name']; ?>">
+                                        <i class="fa-solid <?= $subMenu['icon']; ?> fs-6" style="width: 20px;"></i> 
+                                        <span class="menu-text"><?= $subMenu['menu_name']; ?></span>
+                                    </a>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </li>
+                    <?php endif; ?>
 
-            <ul class="sidebar-nav">
-                <li>
-                    <a href="index.php?action=dashboard" class="<?php echo ($currentAction == 'dashboard') ? 'active' : ''; ?>" title="ภาพรวมระบบ">
-                        <i class="fa-solid fa-chart-pie"></i> <span class="menu-text">ภาพรวมระบบ</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="index.php?action=employees" class="<?php echo (in_array($currentAction, ['employees', 'employee_show', 'edit'])) ? 'active' : ''; ?>" title="ทะเบียนบุคลากร">
-                        <i class="fa-solid fa-address-book"></i> <span class="menu-text">ทะเบียนบุคลากร</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="index.php?action=create" class="<?php echo ($currentAction == 'create') ? 'active' : ''; ?>" title="เพิ่มบุคลากรใหม่">
-                        <i class="fa-solid fa-user-plus"></i> <span class="menu-text">เพิ่มบุคลากรใหม่</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="index.php?action=manpower" class="<?php echo (in_array($currentAction, ['manpower', 'manpower_detail', 'manpower_create', 'manpower_edit'])) ? 'active' : ''; ?>" title="กรอบอัตรากำลัง">
-                        <i class="fa-solid fa-sitemap"></i> <span class="menu-text">กรอบอัตรากำลัง</span>
-                    </a>
-                </li>
-                <li class="nav-item <?= (isset($_GET['action']) && $_GET['action'] == 'manpower_summary') ? 'active' : '' ?>">
-                    <a class="nav-link" href="index.php?action=manpower_summary">
-                        <i class="fas fa-fw fa-chart-pie"></i>
-                        <span>อัตรากำลังแยกส่วน</span>
-                    </a>
-                </li>
-                <li class="mt-4 pt-4 border-top border-secondary border-opacity-25">
-                    <a href="index.php?action=settings" class="<?php echo (in_array($currentAction, ['settings', 'users', 'departments', 'position_levels', 'menus'])) ? 'active' : ''; ?>" title="ตั้งค่าระบบ">
-                        <i class="fa-solid fa-gear"></i> <span class="menu-text">ตั้งค่าระบบ</span>
-                    </a>
-                </li>
-                
-                <!-- ปุ่มออกจากระบบล่างสุด -->
+                <?php endforeach; ?>
+
+                <!-- ปุ่มออกจากระบบ (ดันไปไว้ล่างสุด) -->
                 <li class="mt-auto pt-3 border-top border-secondary border-opacity-25">
                     <a href="index.php?action=logout" class="text-danger hover-danger" onclick="return confirm('ต้องการออกจากระบบใช่หรือไม่?');" title="ออกจากระบบ">
                         <i class="fa-solid fa-right-from-bracket"></i> <span class="menu-text">ออกจากระบบ</span>

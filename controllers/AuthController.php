@@ -1,6 +1,4 @@
 <?php
-require_once 'models/User.php';
-
 class AuthController {
     private $db;
 
@@ -8,66 +6,75 @@ class AuthController {
         $this->db = $db;
     }
 
-    // 1. แสดงหน้าฟอร์ม Login
+    // ฟังก์ชันแสดงหน้าฟอร์มเข้าสู่ระบบ
     public function loginForm() {
-        // ถ้าล็อกอินอยู่แล้ว ให้เด้งไปหน้า Dashboard เลย
-        if(isset($_SESSION['user_id'])) {
+        // หากผู้ใช้ล็อกอินอยู่แล้ว ให้ข้ามหน้าล็อกอินและเด้งไป Dashboard ทันที
+        if (isset($_SESSION['user_id'])) {
             header("Location: index.php?action=dashboard");
             exit();
         }
-        // เรียกหน้า View Login
+        
+        // เรียกไฟล์ View หน้าล็อกอิน
         require_once 'views/auth/login.php';
     }
 
-    // 2. ตรวจสอบข้อมูลเมื่อกดปุ่มเข้าสู่ระบบ
+    // ฟังก์ชันตรวจสอบข้อมูลเมื่อกดปุ่ม "เข้าสู่ระบบ"
     public function loginProcess() {
         if ($_SERVER["REQUEST_METHOD"] == "POST") {
-            $userModel = new User($this->db);
             $username = trim($_POST['username']);
             $password = $_POST['password'];
 
-            $user = $userModel->login($username, $password);
+            // ค้นหาข้อมูลผู้ใช้ในตาราง users
+            $query = "SELECT id, username, password, full_name, role, is_active FROM users WHERE username = :username LIMIT 1";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':username', $username);
+            $stmt->execute();
 
-            if($user) {
-                // ✅ ความปลอดภัย: สร้าง Session ID ใหม่เมื่อล็อกอินสำเร็จเพื่อป้องกัน Session Fixation
-                session_regenerate_id(true);
+            if ($stmt->rowCount() == 1) {
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                // ล็อกอินสำเร็จ เก็บข้อมูลลง Session
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['role'] = $user['role'];
+                // ตรวจสอบว่าบัญชีถูกระงับ (is_active = 0) หรือไม่
+                if ($user['is_active'] == '0') {
+                    $_SESSION['message'] = "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
+                    $_SESSION['message_type'] = "danger";
+                    header("Location: index.php?action=login");
+                    exit();
+                }
 
-                // สร้างข้อความต้อนรับ
-                $_SESSION['message'] = "ยินดีต้อนรับคุณ " . $user['full_name'] . " เข้าสู่ระบบ";
-                $_SESSION['message_type'] = "success";
-                
-                header("Location: index.php?action=dashboard");
-                exit();
+                // ตรวจสอบรหัสผ่านที่เข้ารหัสไว้
+                if (password_verify($password, $user['password'])) {
+                    // สร้าง Session หลังล็อกอินสำเร็จ
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['full_name'] = $user['full_name'];
+                    $_SESSION['role'] = $user['role'];
+
+                    $_SESSION['message'] = "ยินดีต้อนรับเข้าสู่ระบบ";
+                    $_SESSION['message_type'] = "success";
+                    
+                    header("Location: index.php?action=dashboard");
+                    exit();
+                } else {
+                    $_SESSION['message'] = "รหัสผ่านไม่ถูกต้อง";
+                    $_SESSION['message_type'] = "danger";
+                    header("Location: index.php?action=login");
+                    exit();
+                }
             } else {
-                // ล็อกอินไม่สำเร็จ
-                $_SESSION['login_error'] = "ชื่อผู้ใช้งาน หรือ รหัสผ่านไม่ถูกต้อง!";
+                $_SESSION['message'] = "ไม่พบชื่อผู้ใช้งานนี้ในระบบ";
+                $_SESSION['message_type'] = "danger";
                 header("Location: index.php?action=login");
                 exit();
             }
         }
     }
 
-    // 3. ออกจากระบบ (Logout)
+    // ฟังก์ชันออกจากระบบ
     public function logout() {
-        // ✅ ปรับปรุง: ล้างเฉพาะค่า Session ที่เกี่ยวกับการยืนยันตัวตน
-        unset($_SESSION['user_id']);
-        unset($_SESSION['username']);
-        unset($_SESSION['full_name']);
-        unset($_SESSION['role']);
-
-        // ✅ ความปลอดภัย: สร้าง Session ID ใหม่ตอนออกจากระบบ
-        session_regenerate_id(true);
-        
-        // สร้างข้อความแจ้งเตือนว่าออกจากระบบแล้ว
-        $_SESSION['message'] = "คุณได้ออกจากระบบเรียบร้อยแล้ว";
+        session_destroy();
+        session_start();
+        $_SESSION['message'] = "ออกจากระบบเรียบร้อยแล้ว";
         $_SESSION['message_type'] = "success";
-        
         header("Location: index.php?action=login");
         exit();
     }

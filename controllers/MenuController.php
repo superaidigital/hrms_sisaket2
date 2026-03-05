@@ -10,7 +10,15 @@ class MenuController {
 
     public function index() {
         $menuModel = new SystemMenu($this->db);
+        
+        // ดึงเมนูทั้งหมดมาแสดงในตาราง
         $menus = $menuModel->readAll()->fetchAll(PDO::FETCH_ASSOC);
+        
+        // ดึงเฉพาะเมนูหลัก (parent_id = 0) ไปใช้เป็นตัวเลือกในฟอร์ม Dropdown
+        $stmt_main = $this->db->prepare("SELECT * FROM system_menus WHERE parent_id = 0 ORDER BY sort_order ASC");
+        $stmt_main->execute();
+        $mainMenus = $stmt_main->fetchAll(PDO::FETCH_ASSOC);
+
         require_once 'views/menu/index.php';
     }
 
@@ -22,6 +30,8 @@ class MenuController {
                 'icon' => trim($_POST['icon']),
                 'action_name' => trim($_POST['action_name']),
                 'sort_order' => (int)$_POST['sort_order'],
+                'parent_id' => isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : 0,
+                'role_access' => isset($_POST['role_access']) ? trim($_POST['role_access']) : 'all',
                 'is_active' => isset($_POST['is_active']) ? '1' : '0'
             ];
 
@@ -46,6 +56,8 @@ class MenuController {
                 'icon' => trim($_POST['icon']),
                 'action_name' => trim($_POST['action_name']),
                 'sort_order' => (int)$_POST['sort_order'],
+                'parent_id' => isset($_POST['parent_id']) ? (int)$_POST['parent_id'] : 0,
+                'role_access' => isset($_POST['role_access']) ? trim($_POST['role_access']) : 'all',
                 'is_active' => isset($_POST['is_active']) ? '1' : '0'
             ];
 
@@ -69,7 +81,7 @@ class MenuController {
 
             if ($menuModel->toggleActive($id, $status)) {
                 $_SESSION['message'] = "เปลี่ยนสถานะเมนูสำเร็จ!";
-                $_SESSION['message_type পতিত'] = "success";
+                $_SESSION['message_type'] = "success";
             }
             header("Location: index.php?action=menus");
             exit();

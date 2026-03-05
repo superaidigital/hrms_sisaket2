@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 03, 2026 at 05:13 PM
+-- Generation Time: Mar 05, 2026 at 10:01 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.1.25
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -399,21 +399,31 @@ INSERT INTO `position_levels` (`id`, `name`, `type`, `created_at`) VALUES
 
 CREATE TABLE `system_menus` (
   `id` int(11) NOT NULL,
-  `menu_name` varchar(100) NOT NULL,
-  `icon` varchar(100) NOT NULL,
-  `action_name` varchar(100) NOT NULL,
-  `is_active` enum('1','0') DEFAULT '1',
-  `sort_order` int(11) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `menu_name` varchar(255) NOT NULL COMMENT 'ชื่อเมนูที่จะแสดงผล',
+  `icon` varchar(100) NOT NULL COMMENT 'คลาส Icon (เช่น fa-users)',
+  `action_name` varchar(100) NOT NULL COMMENT 'ชื่อ action เพื่อดึงไปใช้ในลิงก์ (?action=...)',
+  `is_active` enum('0','1') NOT NULL DEFAULT '1' COMMENT 'สถานะ: 0=ปิด, 1=เปิด',
+  `sort_order` int(11) NOT NULL DEFAULT 0 COMMENT 'ลำดับการแสดงผล (ตัวเลขน้อยขึ้นก่อน)',
+  `parent_id` int(11) NOT NULL DEFAULT 0 COMMENT 'ID ของเมนูหลัก (0 = เป็นเมนูหลักเอง)',
+  `role_access` varchar(50) NOT NULL DEFAULT 'all' COMMENT 'สิทธิ์ที่มองเห็น (all, admin, user, ฯลฯ)',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `system_menus`
 --
 
-INSERT INTO `system_menus` (`id`, `menu_name`, `icon`, `action_name`, `is_active`, `sort_order`) VALUES
-(1, 'ภาพรวมระบบ', 'fa-chart-pie', 'dashboard', '1', 1),
-(2, 'ทะเบียนบุคลากร', 'fa-users', 'employees', '1', 2),
-(3, 'กรอบอัตรากำลัง', 'fa-sitemap', 'manpower', '1', 3);
+INSERT INTO `system_menus` (`id`, `menu_name`, `icon`, `action_name`, `is_active`, `sort_order`, `parent_id`, `role_access`, `created_at`, `updated_at`) VALUES
+(1, 'แดชบอร์ด', 'fa-gauge', 'dashboard', '1', 1, 0, 'user', '2026-03-05 03:01:39', '2026-03-05 07:52:58'),
+(2, 'อัตรากำลัง', 'fa-chart-pie', 'manpower', '1', 2, 0, 'all', '2026-03-05 03:01:39', '2026-03-05 03:01:39'),
+(3, 'ข้อมูลพนักงาน', 'fa-users', 'employees', '1', 3, 0, 'all', '2026-03-05 03:01:39', '2026-03-05 03:01:39'),
+(4, 'ระดับตำแหน่ง', 'fa-layer-group', 'position_levels', '0', 4, 0, 'all', '2026-03-05 03:01:39', '2026-03-05 07:40:08'),
+(5, 'ข้อมูลแผนก', 'fa-building', 'departments', '0', 5, 0, 'all', '2026-03-05 03:01:39', '2026-03-05 07:40:00'),
+(6, 'รายงาน KP7', 'fa-file-pdf', 'report_kp7', '0', 6, 0, 'all', '2026-03-05 03:01:39', '2026-03-05 07:29:58'),
+(7, 'ผู้ใช้งานระบบ', 'fa-user-shield', 'users', '1', 8, 0, 'admin', '2026-03-05 03:01:39', '2026-03-05 07:27:50'),
+(8, 'จัดการเมนูระบบ', 'fa-bars', 'menus', '1', 7, 0, 'admin', '2026-03-05 03:01:39', '2026-03-05 07:27:44'),
+(9, 'ตั้งค่าระบบ', 'fa-cog', 'settings', '1', 9, 0, 'admin', '2026-03-05 03:01:39', '2026-03-05 07:27:55');
 
 -- --------------------------------------------------------
 
@@ -445,7 +455,8 @@ CREATE TABLE `users` (
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
-  `role` varchar(20) DEFAULT 'admin',
+  `role` enum('admin','hr','user') DEFAULT 'user',
+  `is_active` enum('0','1') DEFAULT '1',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -453,8 +464,9 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `created_at`) VALUES
-(1, 'admin', '$2y$10$LG/1LPqADzE/C4v6Qgm1oeWYKHeFTR6Udps6cpS98fQ7AQai/pYFy', 'ผู้ดูแลระบบ อบจ.', 'admin', '2026-03-02 07:31:18');
+INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `is_active`, `created_at`) VALUES
+(1, 'admin', '$2y$10$AUnFt1/6eoqA.4wV8lDoTOe9VU9dRoCaB2JNnAJJ23MeeStdfTc/.', 'ผู้ดูแลระบบสูงสุด', 'admin', '1', '2026-03-05 07:34:54'),
+(2, 'root', '$2y$10$qC8P6L.513bIPw46vxhMOODEUGWoRemXhyP2KAPaj/Hwpbn1H4J8y', 'คุณสมหญิง ใจดี', 'user', '1', '2026-03-05 07:39:41');
 
 --
 -- Indexes for dumped tables
@@ -471,8 +483,8 @@ ALTER TABLE `departments`
 --
 ALTER TABLE `employees`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `emp_code` (`emp_code`),
-  ADD UNIQUE KEY `national_id` (`national_id`);
+  ADD UNIQUE KEY `national_id` (`national_id`),
+  ADD UNIQUE KEY `emp_code` (`emp_code`);
 
 --
 -- Indexes for table `emp_acting`
@@ -673,13 +685,13 @@ ALTER TABLE `position_levels`
 -- AUTO_INCREMENT for table `system_menus`
 --
 ALTER TABLE `system_menus`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables

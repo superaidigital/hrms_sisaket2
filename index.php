@@ -1,38 +1,60 @@
 <?php
-// เริ่มต้น Session สำหรับเก็บข้อมูลผู้ใช้งานและข้อความแจ้งเตือนต่างๆ
-session_start();
+// 1. เปิดโชว์ Error (ช่วยป้องกันหน้าจอขาว จะได้รู้ว่าพังที่ไหน) **ลบออกได้เมื่อระบบเสร็จสมบูรณ์**
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-// ดึงไฟล์ตั้งค่าฐานข้อมูล
+// 2. เริ่มต้น Session สำหรับเก็บข้อมูลผู้ใช้งานและข้อความแจ้งเตือนต่างๆ
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 3. ดึงไฟล์ตั้งค่าฐานข้อมูล
 require_once 'config/database.php';
 
-// สร้างออบเจกต์ฐานข้อมูล
+// 4. สร้างออบเจกต์ฐานข้อมูล
 $database = new Database();
 $db = $database->getConnection();
 
-// รับค่า action จาก URL (ค่าเริ่มต้นคือไปหน้า login ถ้ายังไม่ได้ล็อกอิน หรือไปหน้า dashboard ถ้าล็อกอินแล้ว)
+// 5. รับค่า action จาก URL 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// --- ตรวจสอบสถานะ Maintenance Mode ---
-if ($action != 'login' && $action != 'logout') {
-    $stmtMode = $db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
-    $stmtMode->execute();
-    $modeResult = $stmtMode->fetch(PDO::FETCH_ASSOC);
-    $maintenance_mode = $modeResult ? $modeResult['setting_value'] : 'off';
-
-    // ถ้าเปิด Maintenance Mode และไม่ใช่ Admin ให้บล็อกการเข้าใช้งาน
-    if ($maintenance_mode == 'on' && (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin')) {
-        die("<div style='text-align:center; margin-top:100px; font-family: sans-serif;'>
-                <h1 style='color:#e74c3c;'>ขออภัย ระบบกำลังปิดปรับปรุง</h1>
-                <p>เรากำลังทำการอัปเดตระบบ กรุณากลับมาใช้งานใหม่ในภายหลัง</p>
-                <a href='index.php?action=login'>กลับไปหน้าเข้าสู่ระบบ</a>
-             </div>");
-    }
-}
-
-// ตรวจสอบว่าล็อกอินแล้วหรือยัง (ยกเว้นหน้า login)
+// ==========================================
+// ลำดับที่ 1: ตรวจสอบการล็อกอินก่อนเป็นอันดับแรก!
+// ==========================================
+// ถ้ายังไม่ได้ล็อกอิน และไม่ได้กำลังพยายามล็อกอิน ให้เด้งไปหน้า login ทันที
 if ($action != 'login' && !isset($_SESSION['user_id'])) {
     header("Location: index.php?action=login");
     exit();
+}
+
+// ตั้งค่าหน้าเริ่มต้น หากล็อกอินแล้วแต่ไม่ได้ระบุ action
+if ($action == '' && isset($_SESSION['user_id'])) {
+    $action = 'dashboard';
+}
+
+// ==========================================
+// ลำดับที่ 2: ตรวจสอบสถานะ Maintenance Mode (เฉพาะคนที่ล็อกอินแล้ว)
+// ==========================================
+if ($action != 'login' && $action != 'logout') {
+    try {
+        $stmtMode = $db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+        $stmtMode->execute();
+        $modeResult = $stmtMode->fetch(PDO::FETCH_ASSOC);
+        $maintenance_mode = $modeResult ? $modeResult['setting_value'] : 'off';
+
+        // ถ้าเปิด Maintenance Mode และไม่ใช่ Admin ให้บล็อกการเข้าใช้งาน
+        if ($maintenance_mode == 'on' && (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin')) {
+            die("<div style='text-align:center; margin-top:100px; font-family: sans-serif;'>
+                    <h1 style='color:#e74c3c;'>ขออภัย ระบบกำลังปิดปรับปรุง</h1>
+                    <p>เรากำลังทำการอัปเดตระบบ กรุณากลับมาใช้งานใหม่ในภายหลัง</p>
+                    <a href='index.php?action=logout' style='padding:10px 20px; background:#3498db; color:#fff; text-decoration:none; border-radius:5px;'>ออกจากระบบ</a>
+                 </div>");
+        }
+    } catch (PDOException $e) {
+        // กรณีที่ตาราง system_settings ยังไม่ถูกสร้าง ให้ระบบข้ามไปก่อน (ป้องกันจอขาว)
+        $maintenance_mode = 'off';
+    }
 }
 
 // ==========================================
@@ -58,7 +80,6 @@ switch ($action) {
 
     // ---- หน้าหลัก (Dashboard) ----
     case 'dashboard':
-    default:
         require_once 'controllers/DashboardController.php';
         $dashboard = new DashboardController($db);
         $dashboard->index();
@@ -150,14 +171,14 @@ switch ($action) {
         $manpower->delete();
         break;
 
-    // 🌟 API สำหรับค้นหาบุคลากร (ในหน้าจัดการกรอบอัตรากำลัง)
+    // 🌟 API สำหรับค้นหาบุคลากร
     case 'search_employee':
         require_once 'controllers/ManpowerController.php';
         $manpower = new ManpowerController($db);
         $manpower->searchEmployee();
         break;
 
-    // 🌟 API สำหรับเพิ่มตำแหน่งด่วนจาก Popup (ในหน้าเพิ่มพนักงาน)
+    // 🌟 API สำหรับเพิ่มตำแหน่งด่วนจาก Popup
     case 'manpower_store_ajax':
         require_once 'controllers/ManpowerController.php';
         $manpower = new ManpowerController($db);
@@ -166,7 +187,6 @@ switch ($action) {
         
     case 'manpower_summary':
         require_once 'controllers/ManpowerController.php';
-        // หากระบบของคุณมีการส่ง $db เข้าไป ให้ใส่ $db ด้วย เช่น new ManpowerController($db)
         $controller = new ManpowerController($db); 
         $controller->summaryReport();
         break;
@@ -245,6 +265,18 @@ switch ($action) {
         $user = new UserController($db);
         $user->delete();
         break;
+        
+    case 'user_reset_pwd':
+        require_once 'controllers/UserController.php';
+        $user = new UserController($db);
+        $user->resetPassword();
+        break;
+
+    case 'user_toggle':
+        require_once 'controllers/UserController.php';
+        $user = new UserController($db);
+        $user->toggleActive();
+        break;
 
     // ---- จัดการเมนู (Menus) ----
     case 'menus':
@@ -256,7 +288,25 @@ switch ($action) {
     case 'menu_toggle':
         require_once 'controllers/MenuController.php';
         $menu = new MenuController($db);
-        $menu->toggle();
+        $menu->toggleActive(); // แก้ไขเป็น toggleActive() แล้ว
+        break;
+
+    case 'menu_store':
+        require_once 'controllers/MenuController.php';
+        $menu = new MenuController($db);
+        $menu->store();
+        break;
+
+    case 'menu_update':
+        require_once 'controllers/MenuController.php';
+        $menu = new MenuController($db);
+        $menu->update();
+        break;
+
+    case 'menu_delete':
+        require_once 'controllers/MenuController.php';
+        $menu = new MenuController($db);
+        $menu->delete();
         break;
 
     // ---- ตั้งค่าระบบหลัก (Settings) ----
@@ -283,6 +333,13 @@ switch ($action) {
         require_once 'controllers/ReportController.php';
         $report = new ReportController($db);
         $report->printKP7();
+        break;
+
+    default:
+        // หากไม่มี action ใดตรงกับข้างบนเลย
+        require_once 'controllers/DashboardController.php';
+        $dashboard = new DashboardController($db);
+        $dashboard->index();
         break;
 }
 ?>

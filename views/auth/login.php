@@ -3,118 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ - HRMS Sisaket PAO</title>
+    <title>เข้าสู่ระบบ - HRMS Sisaket</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts (Prompt) -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
         body {
-            font-family: 'Sarabun', sans-serif;
-            background: linear-gradient(135deg, #0f172a, #1e293b); /* พื้นหลังสีเข้ม Slate */
+            font-family: 'Prompt', sans-serif;
+            background-color: #f8fafc;
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0;
         }
         .login-card {
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            background: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(241, 245, 249, 1);
             overflow: hidden;
             width: 100%;
             max-width: 900px;
             display: flex;
         }
-        .login-left {
-            background: linear-gradient(135deg, #0f766e, #14b8a6); /* Teal Gradient */
-            padding: 4rem;
+        .login-image {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             color: white;
-            width: 50%;
+            padding: 3rem;
+            text-align: center;
+        }
+        .brand-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #2dd4bf, #059669);
+            border-radius: 1.25rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; color: white;
+            margin-bottom: 1.5rem;
+            transform: rotate(-3deg);
+            box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.3);
+        }
+        .login-form-container {
+            flex: 1;
+            padding: 3rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
         }
-        .login-right {
-            padding: 4rem;
-            width: 50%;
-            background: #ffffff;
-        }
         .form-control {
-            padding: 0.8rem 1rem;
-            border-radius: 12px;
-            background-color: #f8fafc;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #cbd5e1;
         }
-        .btn-login {
+        .form-control:focus {
+            box-shadow: 0 0 0 0.25rem rgba(45, 212, 191, 0.25);
+            border-color: #2dd4bf;
+        }
+        .btn-primary {
             background: linear-gradient(to right, #14b8a6, #10b981);
-            color: white;
-            padding: 0.8rem;
-            border-radius: 12px;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
             font-weight: 600;
-            width: 100%;
             transition: all 0.3s;
         }
-        .btn-login:hover {
+        .btn-primary:hover {
+            background: linear-gradient(to right, #0d9488, #059669);
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(20, 184, 166, 0.4);
-            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
-        /* สำหรับหน้าจอมือถือ */
         @media (max-width: 768px) {
-            .login-card { flex-direction: column; max-width: 400px; margin: 20px; }
-            .login-left { width: 100%; padding: 2rem; text-align: center; }
-            .login-right { width: 100%; padding: 2rem; }
+            .login-card {
+                flex-direction: column;
+                max-width: 400px;
+                margin: 1rem;
+            }
+            .login-image {
+                padding: 2rem;
+            }
+            .login-form-container {
+                padding: 2rem;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="login-card">
-    <div class="login-left">
-        <div class="mb-4">
-            <i class="fa-solid fa-users fs-1 mb-3 bg-white text-teal p-3 rounded-circle shadow-sm" style="color: #0d9488;"></i>
+    <div class="login-card">
+        <!-- ฝั่งซ้าย: โลโก้และแบรนด์ -->
+        <div class="login-image">
+            <div class="brand-icon">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <h2 class="fw-bold mb-2">HRMS Sisaket</h2>
+            <p class="text-white-50 mb-0">ระบบบริหารจัดการบุคลากร<br>องค์การบริหารส่วนจังหวัดศรีสะเกษ</p>
         </div>
-        <h1 class="fw-bolder mb-2">HRMS <span style="color: #ccfbf1;">Sisaket</span></h1>
-        <p class="fs-5 opacity-75">ระบบจัดการทรัพยากรบุคคล องค์การบริหารส่วนจังหวัดศรีสะเกษ</p>
-        <div class="mt-auto">
-            <small class="opacity-50">&copy; 2026 Sisaket PAO. All rights reserved.</small>
-        </div>
-    </div>
-    
-    <div class="login-right">
-        <h3 class="fw-bold text-dark mb-4">เข้าสู่ระบบ</h3>
         
-        <?php if(isset($_SESSION['login_error'])): ?>
-            <div class="alert alert-danger rounded-3 small fw-bold">
-                <i class="fa-solid fa-circle-exclamation me-1"></i> <?php echo $_SESSION['login_error']; unset($_SESSION['login_error']); ?>
-            </div>
-        <?php endif; ?>
+        <!-- ฝั่งขวา: ฟอร์มล็อกอิน -->
+        <div class="login-form-container">
+            <h3 class="fw-bold text-dark mb-1">เข้าสู่ระบบ</h3>
+            <p class="text-muted mb-4">กรุณากรอกข้อมูลเพื่อเข้าใช้งานระบบ</p>
 
-        <?php if(isset($_SESSION['message'])): ?>
-            <div class="alert alert-success rounded-3 small fw-bold">
-                <i class="fa-solid fa-circle-check me-1"></i> <?php echo $_SESSION['message']; unset($_SESSION['message']); unset($_SESSION['message_type']); ?>
-            </div>
-        <?php endif; ?>
+            <!-- แสดงแจ้งเตือนกรณีรหัสผ่านผิด -->
+            <?php if(isset($_SESSION['message'])): ?>
+                <div class="alert alert-<?= $_SESSION['message_type'] ?? 'danger'; ?> alert-dismissible fade show border-0 shadow-sm" style="border-radius: 0.75rem;" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid <?= isset($_SESSION['message_type']) && $_SESSION['message_type'] == 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'; ?> me-2"></i>
+                        <?= $_SESSION['message']; ?>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <?php unset($_SESSION['message']); unset($_SESSION['message_type']); ?>
+            <?php endif; ?>
 
-        <form action="index.php?action=login" method="POST">
-            <div class="mb-3">
-                <label class="form-label text-muted small fw-bold text-uppercase">ชื่อผู้ใช้งาน (Username)</label>
-                <input type="text" name="username" class="form-control" required autofocus placeholder="กรอกชื่อผู้ใช้งาน">
+            <form action="index.php?action=login" method="POST">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary">ชื่อผู้ใช้งาน (Username)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0" style="border-radius: 0.75rem 0 0 0.75rem;"><i class="fa-solid fa-user text-muted"></i></span>
+                        <input type="text" name="username" class="form-control border-start-0 ps-0" placeholder="กรอกชื่อผู้ใช้งาน" required autofocus>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary">รหัสผ่าน (Password)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0" style="border-radius: 0.75rem 0 0 0.75rem;"><i class="fa-solid fa-lock text-muted"></i></span>
+                        <input type="password" name="password" class="form-control border-start-0 ps-0" placeholder="กรอกรหัสผ่าน" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 fs-6 text-white shadow-sm">
+                    เข้าสู่ระบบ <i class="fa-solid fa-arrow-right-to-bracket ms-1"></i>
+                </button>
+            </form>
+            
+            <div class="text-center mt-4">
+                <small class="text-muted">&copy; <?= date('Y'); ?> องค์การบริหารส่วนจังหวัดศรีสะเกษ</small>
             </div>
-            <div class="mb-4">
-                <label class="form-label text-muted small fw-bold text-uppercase">รหัสผ่าน (Password)</label>
-                <input type="password" name="password" class="form-control" required placeholder="กรอกรหัสผ่าน">
-            </div>
-            <button type="submit" class="btn btn-login border-0">
-                เข้าสู่ระบบ <i class="fa-solid fa-arrow-right-to-bracket ms-2"></i>
-            </button>
-        </form>
+        </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
